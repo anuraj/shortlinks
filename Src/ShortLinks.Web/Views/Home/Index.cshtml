@@ -1,0 +1,50 @@
+﻿@model List<Link>
+@{
+  ViewData["Title"] = "Home Page";
+}
+
+<partial name="_CreateShortLink" />
+
+@if (Model != null && Model.Any())
+{
+  <div class="card mt-4">
+    <div class="card-header">
+      Shortened Links
+    </div>
+    <div class="card-body">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Alias</th>
+            <th>Long URL</th>
+            <th>Expiration Date</th>
+            <th>Analytics</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var link in Model)
+          {
+            <tr>
+              <td>@link.Alias</td>
+              <td>@link.LongUrl</td>
+              <td>@link.ExpiresAt?.ToString("yyyy-MM-dd")</td>
+              <td><a href="@Url.Action("Analytics", "Home", new { shortCode = link.Alias })">View Analytics</a></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+else
+{
+  <div class="card mt-4">
+    <div class="card-body">
+      <p>No shortened links available.</p>
+    </div>
+  </div>
+}
+
+@section Scripts {
+  <partial name="_ValidationScriptsPartial" />
+}

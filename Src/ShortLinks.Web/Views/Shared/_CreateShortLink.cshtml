@@ -1,0 +1,28 @@
+@model ShortLinks.Shared.ViewModels.Link
+<div class="card">
+  <div class="card-header">
+    Create Shortlinks
+  </div>
+  <div class="card-body">
+    <form method="post">
+      <h4 class="card-title">URL</h4>
+      <div class="mb-3">
+        <label asp-for="LongUrl">Long URL</label>
+        <input asp-for="LongUrl" type="text" id="longUrl" class="form-control" placeholder="URL" />
+        <span asp-validation-for="LongUrl" class="text-danger"></span>
+      </div>
+      <div class="mb-3">
+        <label asp-for="Alias">Alias</label>
+        <input asp-for="Alias" type="text" id="alias" class="form-control" placeholder="Alias" />
+        <span asp-validation-for="Alias" class="text-danger"></span>
+      </div>
+      <div class="mb-3">
+        <label asp-for="ExpiresAt">Expiration Date</label>
+        <input asp-for="ExpiresAt" data-bs-toggle="datepicker" autocomplete="off"
+               placeholder="Choose Expiration Date" id="expiresAt" class="form-control" />
+        <span asp-validation-for="ExpiresAt" class="text-danger"></span>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Create</button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Src/">
+    <Project Path="Src/ShortLinks.Shared/ShortLinks.Shared.csproj" />
+    <Project Path="Src/ShortLinks.Web/ShortLinks.Web.csproj" />
+  </Folder>
+  <Folder Name="/Src/ShortLinks.Api/">
+    <Project Path="Src/ShortLinks.Api/ShortLinks.Api.csproj" />
+  </Folder>
+</Solution>
