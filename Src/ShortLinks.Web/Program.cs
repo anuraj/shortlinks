@@ -13,6 +13,14 @@ builder.Services.AddHttpClient("ApiClient", client =>
     client.BaseAddress = new Uri(builder.Configuration["ApiEndpoint"]!);
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 });
+builder.Services.AddHttpClient("RedirectClient", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["ApiEndpoint"]!);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = false
+});
 
 builder.Services.AddHealthChecks().AddCheck("ApiEndpoint", () =>
 {

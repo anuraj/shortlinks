@@ -15,9 +15,11 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Caching.SqlServer" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.14" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.18.7" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ShortLinks.Shared\ShortLinks.Shared.csproj" />

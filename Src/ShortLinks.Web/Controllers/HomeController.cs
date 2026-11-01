@@ -57,6 +57,49 @@ public class HomeController : Controller
         return View();
     }
 
+    [HttpGet("{alias}")]
+    public async Task<IActionResult> RedirectToUrl(
+    string alias,
+    [FromServices] IHttpClientFactory httpClientFactory,
+    CancellationToken cancellationToken = default)
+    {
+        var client = httpClientFactory.CreateClient("RedirectClient");
+
+        using var response = await client.GetAsync(
+            $"api/{Uri.EscapeDataString(alias)}",
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Gone)
+        {
+            return StatusCode(StatusCodes.Status410Gone);
+        }
+
+        var location = response.Headers.Location;
+
+        if (response.StatusCode != System.Net.HttpStatusCode.Found ||
+            location is null ||
+            !location.IsAbsoluteUri ||
+            (location.Scheme != Uri.UriSchemeHttp &&
+             location.Scheme != Uri.UriSchemeHttps))
+        {
+            _logger.LogError(
+                "Invalid redirect response for alias {Alias}: status {StatusCode}",
+                alias, (int)response.StatusCode);
+
+            return Problem(
+                statusCode: StatusCodes.Status502BadGateway,
+                title: "The link service returned an invalid redirect.");
+        }
+
+        return Redirect(location.AbsoluteUri);
+    }
+
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

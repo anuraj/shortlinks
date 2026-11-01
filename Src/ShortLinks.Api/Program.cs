@@ -6,17 +6,37 @@ using ShortLinks.Shared.Models;
 using ShortLinks.Api.Services;
 using ShortLinks.Shared.ViewModels;
 using System.Globalization;
+using Microsoft.Extensions.Caching.Hybrid;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<ShortLinksDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("ShortlinksConnection"))
-);
+builder.Services.AddDbContextFactory<ShortLinksDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("ShortlinksConnection")));
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ShortLinksDbContext>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddValidation();
+
+builder.Services.AddDistributedSqlServerCache(options =>
+{
+    options.ConnectionString =
+        builder.Configuration.GetConnectionString("ShortlinksConnection")
+        ?? throw new InvalidOperationException("CacheConnection is missing.");
+
+    options.SchemaName = "dbo";
+    options.TableName = "DistributedCache";
+});
+
+builder.Services.AddHybridCache(options =>
+{
+    options.DefaultEntryOptions = new()
+    {
+        Expiration = TimeSpan.FromMinutes(5),
+        LocalCacheExpiration = TimeSpan.FromSeconds(30)
+    };
+});
 
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<UrlShortenService>();
@@ -103,7 +123,7 @@ app.MapGet("/api/analytics/{alias}", async ([FromRoute] string alias,
             UserAgent = c.UserAgent
         })
         .ToListAsync(cancellationToken);
-        
+
     httpContext.Response.Headers["PageNumber"] = page.Value.ToString(CultureInfo.InvariantCulture);
     httpContext.Response.Headers["Size"] = pageSize.Value.ToString(CultureInfo.InvariantCulture);
     httpContext.Response.Headers["Total"] = totalRows.ToString(CultureInfo.InvariantCulture);
@@ -114,12 +134,36 @@ app.MapGet("/api/analytics/{alias}", async ([FromRoute] string alias,
 .WithDescription("Retrieves analytics for a given short code.");
 
 app.MapGet("/api/{alias}", async ([FromRoute] string alias, [FromServices] ShortLinksDbContext dbContext,
-    [FromServices] IHttpContextAccessor httpContextAccessor, CancellationToken cancellationToken) =>
+    [FromServices] IHttpContextAccessor httpContextAccessor,
+    [FromServices] HybridCache cache,
+    [FromServices] IDbContextFactory<ShortLinksDbContext> contextFactory,
+    CancellationToken cancellationToken) =>
 {
-    var linkEntity = await dbContext.Links.FirstOrDefaultAsync(l => l.Alias == alias, cancellationToken);
-    if (linkEntity == null)
+    var link = await cache.GetOrCreateAsync<CachedLink?>(
+    $"link:v1:{alias}",
+    async token =>
+    {
+        await using var lookupContext =
+            await contextFactory.CreateDbContextAsync(token);
+
+        return await lookupContext.Links
+            .AsNoTracking()
+            .Where(l => l.Alias == alias)
+            .Select(l => new CachedLink(
+                l.LongUrl, l.ExpiresAt, l.IsExpired))
+            .FirstOrDefaultAsync(token);
+    },
+    cancellationToken: cancellationToken);
+
+    if (link is null)
     {
         return Results.NotFound(new { Message = "Short code not found." });
+    }
+
+    if (link.IsExpired ||
+        (link.ExpiresAt.HasValue && link.ExpiresAt.Value <= DateTime.UtcNow))
+    {
+        return Results.StatusCode(StatusCodes.Status410Gone);
     }
 
     var linkClick = new LinkClickEntity
@@ -132,7 +176,7 @@ app.MapGet("/api/{alias}", async ([FromRoute] string alias, [FromServices] Short
     dbContext.LinkClicks.Add(linkClick);
     await dbContext.SaveChangesAsync(cancellationToken);
 
-    return Results.Redirect(linkEntity.LongUrl);
+    return Results.Redirect(link.LongUrl);
 })
 .WithDisplayName("Redirect Short URL")
 .WithDescription("Redirects to the original long URL for a given short code.");
@@ -169,3 +213,9 @@ app.MapGet("/api/links", async ([FromServices] ShortLinksDbContext dbContext, Ht
 app.MapHealthChecks("/health");
 
 await app.RunAsync();
+
+
+public sealed record CachedLink(
+    string LongUrl,
+    DateTime? ExpiresAt,
+    bool IsExpired);
