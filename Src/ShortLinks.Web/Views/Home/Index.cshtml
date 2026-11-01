@@ -1,4 +1,5 @@
-﻿@model List<Link>
+﻿@using X.PagedList.Mvc.Core
+@model IPagedList<Link>
 @{
   ViewData["Title"] = "Home Page";
 }
@@ -33,6 +34,20 @@
           }
         </tbody>
       </table>
+    </div>
+    <div class="card-footer">
+      @Html.PagedListPager(Model, page => Url.Action("index", new { page = page }), new PagedListRenderOptions()
+      {
+          ActiveLiElementClass = "active",
+          PageClasses = new[]{ "page-link"},
+          LiElementClasses=new[] { "page-item" },
+          UlElementClasses = new[] { "pagination","justify-content-center", "mt-3" },
+          LinkToNextPageFormat = "Next",
+          LinkToPreviousPageFormat = "Previous",
+          MaximumPageNumbersToDisplay = 5,
+          DisplayLinkToPreviousPage = PagedListDisplayMode.Always,
+          DisplayLinkToNextPage = PagedListDisplayMode.Always
+      })
     </div>
   </div>
 }

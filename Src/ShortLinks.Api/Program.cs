@@ -5,6 +5,7 @@ using ShortLinks.Shared.Data;
 using ShortLinks.Shared.Models;
 using ShortLinks.Api.Services;
 using ShortLinks.Shared.ViewModels;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,16 +31,16 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/api/shorten", async ([FromServices] ShortLinksDbContext dbContext, 
+app.MapPost("/api/shorten", async ([FromServices] ShortLinksDbContext dbContext,
     [FromBody] Link link, [FromServices] UrlShortenService urlShortenService, CancellationToken cancellationToken) =>
 {
-    if (!Uri.TryCreate(link.LongUrl, UriKind.Absolute, out var uriResult) || 
+    if (!Uri.TryCreate(link.LongUrl, UriKind.Absolute, out var uriResult) ||
         (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
     {
         return Results.BadRequest(new { Message = "Invalid long URL." });
     }
 
-    var invalidDate = link.ExpiresAt.HasValue 
+    var invalidDate = link.ExpiresAt.HasValue
         && link.ExpiresAt.Value <= DateTime.UtcNow;
     if (invalidDate)
     {
@@ -57,7 +58,7 @@ app.MapPost("/api/shorten", async ([FromServices] ShortLinksDbContext dbContext,
         IsCustom = link.Alias != null
     };
 
-    var shortCodeExists = 
+    var shortCodeExists =
         await dbContext.Links.AnyAsync(l => l.Alias == linkEntity.Alias, cancellationToken);
     if (shortCodeExists)
     {
@@ -77,16 +78,23 @@ app.MapPost("/api/shorten", async ([FromServices] ShortLinksDbContext dbContext,
 .WithDisplayName("Shorten URL")
 .WithDescription("Shortens a given long URL into a short link.");
 
-app.MapGet("/api/analytics/{alias}", async ([FromRoute] string alias, [FromServices] ShortLinksDbContext dbContext, CancellationToken cancellationToken) =>
+app.MapGet("/api/analytics/{alias}", async ([FromRoute] string alias,
+    [FromServices] ShortLinksDbContext dbContext, HttpContext httpContext, [FromQuery] int? page = 1,
+    [FromQuery] int? pageSize = 10, CancellationToken cancellationToken = default) =>
 {
     var linkEntity = await dbContext.Links.FirstOrDefaultAsync(l => l.Alias == alias, cancellationToken);
     if (linkEntity == null)
     {
         return Results.NotFound(new { Message = "Short code not found." });
     }
-
+    page ??= 1;
+    pageSize ??= 10;
+    var totalRows = await dbContext.LinkClicks.CountAsync(c => c.Alias == alias, cancellationToken);
     var clicks = await dbContext.LinkClicks
         .Where(c => c.Alias == alias)
+        .OrderByDescending(c => c.ClickedAt)
+        .Skip((page.Value - 1) * pageSize.Value)
+        .Take(pageSize.Value)
         .Select(c => new LinkClick
         {
             Alias = c.Alias,
@@ -95,21 +103,25 @@ app.MapGet("/api/analytics/{alias}", async ([FromRoute] string alias, [FromServi
             UserAgent = c.UserAgent
         })
         .ToListAsync(cancellationToken);
+        
+    httpContext.Response.Headers["PageNumber"] = page.Value.ToString(CultureInfo.InvariantCulture);
+    httpContext.Response.Headers["Size"] = pageSize.Value.ToString(CultureInfo.InvariantCulture);
+    httpContext.Response.Headers["Total"] = totalRows.ToString(CultureInfo.InvariantCulture);
 
     return Results.Ok(clicks);
 })
 .WithDisplayName("Get Short URL Analytics")
 .WithDescription("Retrieves analytics for a given short code.");
 
-app.MapGet("/api/{alias}", async ([FromRoute] string alias, [FromServices] ShortLinksDbContext dbContext, 
-    [FromServices]IHttpContextAccessor httpContextAccessor, CancellationToken cancellationToken) =>
+app.MapGet("/api/{alias}", async ([FromRoute] string alias, [FromServices] ShortLinksDbContext dbContext,
+    [FromServices] IHttpContextAccessor httpContextAccessor, CancellationToken cancellationToken) =>
 {
     var linkEntity = await dbContext.Links.FirstOrDefaultAsync(l => l.Alias == alias, cancellationToken);
     if (linkEntity == null)
     {
         return Results.NotFound(new { Message = "Short code not found." });
     }
-    
+
     var linkClick = new LinkClickEntity
     {
         Alias = alias,
@@ -125,15 +137,30 @@ app.MapGet("/api/{alias}", async ([FromRoute] string alias, [FromServices] Short
 .WithDisplayName("Redirect Short URL")
 .WithDescription("Redirects to the original long URL for a given short code.");
 
-app.MapGet("/api/links", async ([FromServices] ShortLinksDbContext dbContext, CancellationToken cancellationToken) =>
+app.MapGet("/api/links", async ([FromServices] ShortLinksDbContext dbContext, HttpContext httpContext, [FromQuery] int? page = 1,
+    [FromQuery] int? pageSize = 10, CancellationToken cancellationToken = default) =>
 {
-    var linkEntities = await dbContext.Links.ToListAsync(cancellationToken);
+    page ??= 1;
+    pageSize ??= 10;
+    var totalRows = await dbContext.Links.CountAsync(cancellationToken);
+    var linkEntities = await dbContext.Links
+        .OrderByDescending(l => l.CreatedAt)
+        .ThenBy(l => l.Alias)
+        .Skip((page.Value - 1) * pageSize.Value)
+        .Take(pageSize.Value)
+        .ToListAsync(cancellationToken);
+
     var links = linkEntities.Select(l => new Link
     {
         Alias = l.Alias,
         LongUrl = l.LongUrl,
         ExpiresAt = l.ExpiresAt,
-    });
+    }).ToList();
+
+    httpContext.Response.Headers["PageNumber"] = page.Value.ToString(CultureInfo.InvariantCulture);
+    httpContext.Response.Headers["Size"] = pageSize.Value.ToString(CultureInfo.InvariantCulture);
+    httpContext.Response.Headers["Total"] = totalRows.ToString(CultureInfo.InvariantCulture);
+
     return Results.Ok(links);
 })
 .WithDisplayName("Get All Links")
