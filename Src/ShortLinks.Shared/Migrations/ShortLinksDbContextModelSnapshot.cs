@@ -8,7 +8,7 @@ using ShortLinks.Shared.Data;
 
 #nullable disable
 
-namespace ShortLinks.Shared.Src.ShortLinks.Shared.Migrations
+namespace ShortLinks.Shared.Migrations
 {
     [DbContext(typeof(ShortLinksDbContext))]
     partial class ShortLinksDbContextModelSnapshot : ModelSnapshot

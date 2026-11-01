@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ShortLinks.Shared.Src.ShortLinks.Shared.Migrations
+namespace ShortLinks.Shared.Migrations
 {
     /// <inheritdoc />
     public partial class InitialMigrations : Migration

@@ -9,10 +9,10 @@ using ShortLinks.Shared.Data;
 
 #nullable disable
 
-namespace ShortLinks.Shared.Src.ShortLinks.Shared.Migrations
+namespace ShortLinks.Shared.Migrations
 {
     [DbContext(typeof(ShortLinksDbContext))]
-    [Migration("20261101065720_InitialMigrations")]
+    [Migration("20261101071244_InitialMigrations")]
     partial class InitialMigrations
     {
         /// <inheritdoc />
