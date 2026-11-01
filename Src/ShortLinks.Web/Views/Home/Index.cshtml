@@ -3,7 +3,7 @@
   ViewData["Title"] = "Home Page";
 }
 
-<partial name="_CreateShortLink" />
+<partial name="_CreateShortLink" model="new Link()" />
 
 @if (Model != null && Model.Any())
 {

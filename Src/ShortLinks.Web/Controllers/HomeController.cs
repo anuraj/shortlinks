@@ -35,6 +35,8 @@ public class HomeController : Controller
 
             ModelState.AddModelError(string.Empty, "An error occurred while creating the link.");
         }
+        
+        ModelState.AddModelError(string.Empty, "An error occurred while creating the link.");
         return RedirectToAction(nameof(Index));
     }
 
